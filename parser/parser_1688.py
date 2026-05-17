@@ -24,7 +24,7 @@ async def init_browser():
     playwright_instance = await async_playwright().start()
 
     browser = await playwright_instance.chromium.launch(
-        executable_path="/usr/bin/chromium",
+        channel="chromium",
         headless=True,
         args=[
             "--no-sandbox",
