@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+
+    <style>
+
+        *{
+            margin:0;
+            padding:0;
+            box-sizing:border-box;
+        }
+
+        body{
+            font-family: Arial, sans-serif;
+            background:#f4f7fb;
+            padding:40px;
+            color:#2c3e50;
+        }
+
+        h1{
+            margin-bottom:30px;
+            font-size:32px;
+        }
+
+        .grid{
+            display:grid;
+            grid-template-columns:repeat(auto-fill,minmax(380px,1fr));
+            gap:25px;
+        }
+
+        .card{
+            background:white;
+            border-radius:18px;
+            padding:25px;
+            box-shadow:0 4px 15px rgba(0,0,0,0.08);
+            transition:0.2s;
+        }
+
+        .card:hover{
+            transform:translateY(-4px);
+        }
+
+        .order-id{
+            font-size:22px;
+            font-weight:bold;
+            margin-bottom:18px;
+        }
+
+        .info{
+            margin-bottom:10px;
+            font-size:16px;
+        }
+
+        .status{
+            display:inline-block;
+            padding:8px 14px;
+            border-radius:12px;
+            color:white;
+            font-weight:bold;
+            margin-top:10px;
+            margin-bottom:20px;
+        }
+
+        .new{
+            background:#3498db;
+        }
+
+        .paid{
+            background:#2ecc71;
+        }
+
+        .delivery{
+            background:#f39c12;
+        }
+
+        .done{
+            background:#27ae60;
+        }
+
+        .cancelled{
+            background:#e74c3c;
+        }
+
+        .buttons{
+            display:flex;
+            flex-wrap:wrap;
+            gap:10px;
+        }
+
+        .buttons a{
+            text-decoration:none;
+            color:white;
+            padding:10px 14px;
+            border-radius:10px;
+            font-size:14px;
+            transition:0.2s;
+        }
+
+        .buttons a:hover{
+            opacity:0.85;
+        }
+
+        .empty{
+            font-size:22px;
+            color:#7f8c8d;
+            margin-top:50px;
+        }
+
+    </style>
+
+</head>
+<body>
+
+<h1>📦 Админка заказов</h1>
+
+{% if orders %}
+
+<div class="grid">
+
+{% for order in orders %}
+
+<div class="card">
+
+    <div class="order-id">
+        Заказ #{{ order.id }}
+    </div>
+
+    <div class="info">
+        👤 Пользователь: {{ order.user_id }}
+    </div>
+
+    <div class="info">
+        📦 Товар: {{ order.product_name }}
+    </div>
+
+    <div class="info">
+        🎨 SKU: {{ order.sku_name }}
+    </div>
+
+    <div class="info">
+        📊 Количество: {{ order.quantity }}
+    </div>
+
+    <div class="info">
+        💴 Сумма: {{ order.total_rub }} ₽
+    </div>
+
+    <div class="status {{ order.status }}">
+        {{ order.status }}
+    </div>
+
+    <div class="buttons">
+
+        <a class="new"
+           href="/status/{{ order.id }}/new">
+            Новый
+        </a>
+
+        <a class="paid"
+           href="/status/{{ order.id }}/paid">
+            Оплачен
+        </a>
+
+        <a class="delivery"
+           href="/status/{{ order.id }}/delivery">
+            Доставка
+        </a>
+
+        <a class="done"
+           href="/status/{{ order.id }}/done">
+            Завершён
+        </a>
+
+        <a class="cancelled"
+           href="/status/{{ order.id }}/cancelled">
+            Отмена
+        </a>
+
+    </div>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+{% else %}
+
+<div class="empty">
+    📭 Заказов пока нет
+</div>
+
+{% endif %}
+
+</body>
+</html>

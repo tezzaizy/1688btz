@@ -1,0 +1,18 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# PyCharm
+.idea/
+
+# Browser data
+userdata/
+bot/userdata/
+
+# Database
+*.db
+*.sqlite3
+
+# Env
+.env
