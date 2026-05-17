@@ -9,6 +9,7 @@ playwright_instance = None
 
 
 # СТАРТ БРАУЗЕРА
+# START BROWSER
 async def init_browser():
 
     global browser
@@ -16,28 +17,28 @@ async def init_browser():
     global playwright_instance
 
     try:
-        if context:
-            _ = context.pages
+        if browser:
             return context
     except:
         pass
 
     playwright_instance = await async_playwright().start()
 
-    browser = await playwright_instance.chromium.launch_persistent_context(
-        user_data_dir="userdata",
+    browser = await playwright_instance.chromium.launch(
         headless=True,
-        viewport={
-            "width": 1280,
-            "height": 900
-        },
         args=[
-            "--start-maximized",
+            "--no-sandbox",
+            "--disable-dev-shm-usage",
             "--disable-blink-features=AutomationControlled"
         ]
     )
 
-    context = browser
+    context = await browser.new_context(
+        viewport={
+            "width": 1280,
+            "height": 900
+        }
+    )
 
     print("BROWSER STARTED")
 
