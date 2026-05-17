@@ -1,9 +1,11 @@
-from sqlalchemy import Column, Integer, String, Float
+from sqlalchemy import Column, Integer, String, Float, Text
 
 from database.db import Base
 
 
 class Order(Base):
+
+    product_url = Column(Text)
 
     __tablename__ = "orders"
 
@@ -12,7 +14,7 @@ class Order(Base):
     user_id = Column(Integer)
 
     product_name = Column(String)
-
+    username = Column(String)
     sku_name = Column(String)
 
     quantity = Column(Integer)
@@ -34,6 +36,8 @@ class Settings(Base):
 
 
 class CartItem(Base):
+    product_url = Column(Text)
+    username = Column(String)
 
     __tablename__ = "cart_items"
 

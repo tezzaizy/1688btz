@@ -235,12 +235,15 @@ async def admin_panel(message: Message):
 
         text = (
             f"🆔 <b>Заказ #{order.id}</b>\n\n"
-            f"👤 {order.user_id}\n"
+            f"👤 @{order.username}\n"
+            f"🆔 {order.user_id}\n"
+            f"🔗 https://t.me/{order.username}\n\n"
             f"📦 {order.product_name}\n"
             f"📏 {order.sku_name}\n"
             f"📊 {order.quantity} шт\n"
             f"💴 {order.total_rub:.2f} ₽\n"
-            f"📌 {ru_status}"
+            f"📌 {ru_status}\n\n"
+            f"🔗 {order.product_url}"
         )
 
         await message.answer(
@@ -336,7 +339,8 @@ async def show_cart(message: Message):
             f"📦 {item.product_name}\n"
             f"📏 {item.sku_name}\n"
             f"📊 {item.quantity} шт\n"
-            f"💴 {item.total_rub:.2f} ₽\n\n"
+            f"💴 {item.total_rub:.2f} ₽\n"
+            f"🔗 {item.product_url}"
         )
 
         total += item.total_rub
@@ -412,6 +416,7 @@ async def checkout(callback: CallbackQuery):
             order = Order(
 
                 user_id=item.user_id,
+                username=item.username,
 
                 product_name=item.product_name,
 
@@ -422,6 +427,8 @@ async def checkout(callback: CallbackQuery):
                 total_yuan=item.price_yuan * item.quantity,
 
                 total_rub=item.total_rub,
+
+                product_url=item.product_url,
 
                 status="new"
             )
@@ -435,14 +442,18 @@ async def checkout(callback: CallbackQuery):
                 await bot.send_message(
                     ADMIN_ID,
                     f"🚨 НОВЫЙ ЗАКАЗ\n\n"
+                    f"👤 @{item.username}\n"
+                    f"🆔 {item.user_id}\n\n"
                     f"📦 {item.product_name}\n"
                     f"📏 {item.sku_name}\n"
                     f"📊 {item.quantity}\n"
-                    f"💴 {item.total_rub:.2f} ₽"
+                    f"💴 {item.total_rub:.2f} ₽\n\n"
+                    f"🔗 {item.product_url}\n\n"
+                    f"https://t.me/{item.username}"
                 )
 
-            except:
-                pass
+            except Exception as e:
+                print(e)
 
         for item in items:
             await session.delete(item)
@@ -476,6 +487,7 @@ async def get_quantity(message: Message, state: FSMContext):
     sku_name = data["sku_name"]
 
     image = data.get("image")
+    product_url = data.get("product_url")
 
     price_text = str(data["sku_price"])
 
@@ -545,6 +557,7 @@ async def get_quantity(message: Message, state: FSMContext):
         cart_item = CartItem(
 
             user_id=message.from_user.id,
+            username=message.from_user.username,
 
             product_name=product_name,
 
@@ -556,7 +569,8 @@ async def get_quantity(message: Message, state: FSMContext):
 
             total_rub=final_price,
 
-            image=image
+            image=image,
+            product_url=product_url
         )
 
         session.add(cart_item)
@@ -608,6 +622,8 @@ async def get_link(message: Message, state: FSMContext):
         )
 
         return
+
+    data["product_url"] = message.text
 
     products_cache[message.from_user.id] = data
 
@@ -695,7 +711,8 @@ async def choose_sku(callback: CallbackQuery, state: FSMContext):
         product_name=data["title"],
         sku_name=sku["name"],
         sku_price=sku["price"],
-        image=data.get("image")
+        image=data.get("image"),
+        product_url=data.get("product_url")
     )
 
     await state.set_state(
