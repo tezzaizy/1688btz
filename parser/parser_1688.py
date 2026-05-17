@@ -25,7 +25,7 @@ async def init_browser():
 
     browser = await playwright_instance.chromium.launch(
         channel="chromium",
-        headless=True,
+        headless=False,
         args=[
             "--no-sandbox",
             "--disable-dev-shm-usage",
@@ -103,6 +103,7 @@ async def parse_1688_product(url):
             timeout=60000,
             wait_until="networkidle"
         )
+        await page.wait_for_timeout(10000)
 
         # Ждем появления SKU
         try:
