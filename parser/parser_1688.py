@@ -26,7 +26,7 @@ async def init_browser():
 
     browser = await playwright_instance.chromium.launch_persistent_context(
         user_data_dir="userdata",
-        headless=False,
+        headless=True,
         viewport={
             "width": 1280,
             "height": 900
