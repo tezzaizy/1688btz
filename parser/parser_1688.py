@@ -9,7 +9,6 @@ playwright_instance = None
 
 
 # СТАРТ БРАУЗЕРА
-# START BROWSER
 async def init_browser():
 
     global browser
