@@ -14,13 +14,5 @@ bot/userdata/
 *.db
 *.sqlite3
 
-# Env
+# Environment
 .env
-
-.venv
-__pycache__
-*.pyc
-orders.db
-userdata
-.env
-.idea
