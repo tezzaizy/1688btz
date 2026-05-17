@@ -24,10 +24,12 @@ async def init_browser():
     playwright_instance = await async_playwright().start()
 
     browser = await playwright_instance.chromium.launch(
+        executable_path="/usr/bin/chromium",
         headless=True,
         args=[
             "--no-sandbox",
             "--disable-dev-shm-usage",
+            "--disable-gpu",
             "--disable-blink-features=AutomationControlled"
         ]
     )
