@@ -25,7 +25,7 @@ async def init_browser():
 
     browser = await playwright_instance.chromium.launch(
         channel="chromium",
-        headless=False,
+        headless=True,
         args=[
             "--no-sandbox",
             "--disable-dev-shm-usage",
