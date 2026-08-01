@@ -2,7 +2,8 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Admin Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Админка заказов</title>
 
     <style>
 
@@ -13,54 +14,88 @@
         }
 
         body{
-            font-family: Arial, sans-serif;
-            background:#f4f7fb;
-            padding:40px;
+            font-family:Arial,sans-serif;
+            background:#f3f5f9;
             color:#2c3e50;
+            padding:30px;
         }
 
         h1{
+            font-size:34px;
             margin-bottom:30px;
-            font-size:32px;
+            font-weight:700;
         }
 
         .grid{
             display:grid;
-            grid-template-columns:repeat(auto-fill,minmax(380px,1fr));
+            grid-template-columns:repeat(auto-fill,minmax(420px,1fr));
             gap:25px;
         }
 
         .card{
             background:white;
-            border-radius:18px;
-            padding:25px;
-            box-shadow:0 4px 15px rgba(0,0,0,0.08);
+            border-radius:22px;
+            overflow:hidden;
+            box-shadow:0 6px 20px rgba(0,0,0,0.08);
             transition:0.2s;
+            display:flex;
+            flex-direction:column;
         }
 
         .card:hover{
-            transform:translateY(-4px);
+            transform:translateY(-5px);
+        }
+
+        .image{
+            width:100%;
+            height:280px;
+            object-fit:cover;
+            background:#eee;
+        }
+
+        .content{
+            padding:24px;
         }
 
         .order-id{
-            font-size:22px;
-            font-weight:bold;
+            font-size:24px;
+            font-weight:700;
             margin-bottom:18px;
         }
 
         .info{
-            margin-bottom:10px;
-            font-size:16px;
+            margin-bottom:12px;
+            font-size:15px;
+            line-height:1.5;
+            word-break:break-word;
+        }
+
+        .product-name{
+            font-size:17px;
+            font-weight:600;
+            color:#111;
+        }
+
+        .sku{
+            color:#555;
+        }
+
+        .price{
+            font-size:22px;
+            font-weight:bold;
+            color:#27ae60;
+            margin-top:10px;
         }
 
         .status{
             display:inline-block;
-            padding:8px 14px;
+            padding:10px 16px;
             border-radius:12px;
             color:white;
             font-weight:bold;
-            margin-top:10px;
+            margin-top:18px;
             margin-bottom:20px;
+            font-size:14px;
         }
 
         .new{
@@ -87,30 +122,85 @@
             display:flex;
             flex-wrap:wrap;
             gap:10px;
+            margin-top:10px;
         }
 
         .buttons a{
             text-decoration:none;
             color:white;
             padding:10px 14px;
-            border-radius:10px;
+            border-radius:12px;
             font-size:14px;
+            font-weight:bold;
             transition:0.2s;
         }
 
         .buttons a:hover{
+            transform:scale(1.05);
+        }
+
+        .btn-new{
+            background:#3498db;
+        }
+
+        .btn-paid{
+            background:#2ecc71;
+        }
+
+        .btn-delivery{
+            background:#f39c12;
+        }
+
+        .btn-done{
+            background:#27ae60;
+        }
+
+        .btn-cancel{
+            background:#e74c3c;
+        }
+
+        .product-link{
+            display:inline-block;
+            margin-top:12px;
+            text-decoration:none;
+            color:white;
+            background:#111;
+            padding:10px 16px;
+            border-radius:12px;
+            font-size:14px;
+            font-weight:bold;
+        }
+
+        .product-link:hover{
             opacity:0.85;
         }
 
         .empty{
-            font-size:22px;
+            font-size:24px;
             color:#7f8c8d;
-            margin-top:50px;
+            margin-top:60px;
+        }
+
+        @media(max-width:700px){
+
+            body{
+                padding:15px;
+            }
+
+            .grid{
+                grid-template-columns:1fr;
+            }
+
+            .image{
+                height:220px;
+            }
+
         }
 
     </style>
 
 </head>
+
 <body>
 
 <h1>📦 Админка заказов</h1>
@@ -123,60 +213,78 @@
 
 <div class="card">
 
-    <div class="order-id">
-        Заказ #{{ order.id }}
-    </div>
+    {% if order.image %}
+    <img class="image" src="{{ order.image }}">
+    {% endif %}
 
-    <div class="info">
-        👤 Пользователь: {{ order.user_id }}
-    </div>
+    <div class="content">
 
-    <div class="info">
-        📦 Товар: {{ order.product_name }}
-    </div>
+        <div class="order-id">
+            Заказ #{{ order.id }}
+        </div>
 
-    <div class="info">
-        🎨 SKU: {{ order.sku_name }}
-    </div>
+        <div class="info">
+            👤 <b>Пользователь:</b> {{ order.user_id }}
+        </div>
 
-    <div class="info">
-        📊 Количество: {{ order.quantity }}
-    </div>
+        <div class="info product-name">
+            📦 {{ order.product_name }}
+        </div>
 
-    <div class="info">
-        💴 Сумма: {{ order.total_rub }} ₽
-    </div>
+        <div class="info sku">
+            🎨 {{ order.sku_name }}
+        </div>
 
-    <div class="status {{ order.status }}">
-        {{ order.status }}
-    </div>
+        <div class="info">
+            📊 Количество: <b>{{ order.quantity }}</b>
+        </div>
 
-    <div class="buttons">
+        <div class="price">
+            💴 {{ order.total_rub }} ₽
+        </div>
 
-        <a class="new"
-           href="/status/{{ order.id }}/new">
-            Новый
+        <div class="status {{ order.status }}">
+            {{ order.status }}
+        </div>
+
+        {% if order.product_url %}
+        <a
+            class="product-link"
+            href="{{ order.product_url }}"
+            target="_blank"
+        >
+            🔗 Открыть товар
         </a>
+        {% endif %}
 
-        <a class="paid"
-           href="/status/{{ order.id }}/paid">
-            Оплачен
-        </a>
+        <div class="buttons">
 
-        <a class="delivery"
-           href="/status/{{ order.id }}/delivery">
-            Доставка
-        </a>
+            <a class="btn-new"
+               href="/status/{{ order.id }}/new">
+                Новый
+            </a>
 
-        <a class="done"
-           href="/status/{{ order.id }}/done">
-            Завершён
-        </a>
+            <a class="btn-paid"
+               href="/status/{{ order.id }}/paid">
+                Оплачен
+            </a>
 
-        <a class="cancelled"
-           href="/status/{{ order.id }}/cancelled">
-            Отмена
-        </a>
+            <a class="btn-delivery"
+               href="/status/{{ order.id }}/delivery">
+                Доставка
+            </a>
+
+            <a class="btn-done"
+               href="/status/{{ order.id }}/done">
+                Завершён
+            </a>
+
+            <a class="btn-cancel"
+               href="/status/{{ order.id }}/cancelled">
+                Отмена
+            </a>
+
+        </div>
 
     </div>
 

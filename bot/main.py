@@ -242,8 +242,7 @@ async def admin_panel(message: Message):
             f"📏 {order.sku_name}\n"
             f"📊 {order.quantity} шт\n"
             f"💴 {order.total_rub:.2f} ₽\n"
-            f"📌 {ru_status}\n\n"
-            f"🔗 {order.product_url}"
+            f"📌 {ru_status}"
         )
 
         await message.answer(
@@ -339,8 +338,7 @@ async def show_cart(message: Message):
             f"📦 {item.product_name}\n"
             f"📏 {item.sku_name}\n"
             f"📊 {item.quantity} шт\n"
-            f"💴 {item.total_rub:.2f} ₽\n"
-            f"🔗 {item.product_url}"
+            f"💴 {item.total_rub:.2f} ₽\n\n"
         )
 
         total += item.total_rub
@@ -416,9 +414,9 @@ async def checkout(callback: CallbackQuery):
             order = Order(
 
                 user_id=item.user_id,
-                username=item.username,
 
                 product_name=item.product_name,
+                username=item.username,
 
                 sku_name=item.sku_name,
 
@@ -428,32 +426,43 @@ async def checkout(callback: CallbackQuery):
 
                 total_rub=item.total_rub,
 
-                product_url=item.product_url,
-
                 status="new"
             )
 
             session.add(order)
 
             total += item.total_rub
-
+            print("CHECKOUT START")
+            print("ADMIN ID:", ADMIN_ID)
+            print("USER:", callback.from_user.id)
             try:
+                print("BEFORE ADMIN MESSAGE")
 
                 await bot.send_message(
-                    ADMIN_ID,
-                    f"🚨 НОВЫЙ ЗАКАЗ\n\n"
-                    f"👤 @{item.username}\n"
-                    f"🆔 {item.user_id}\n\n"
-                    f"📦 {item.product_name}\n"
-                    f"📏 {item.sku_name}\n"
-                    f"📊 {item.quantity}\n"
-                    f"💴 {item.total_rub:.2f} ₽\n\n"
-                    f"🔗 {item.product_url}\n\n"
-                    f"https://t.me/{item.username}"
+                    chat_id=ADMIN_ID,
+                    text=(
+                        f"🚨 НОВЫЙ ЗАКАЗ\n\n"
+                        f"👤 @{item.username}\n"
+                        f"🆔 {item.user_id}\n\n"
+                        f"📦 {item.product_name}\n"
+                        f"📏 {item.sku_name}\n"
+                        f"📊 {item.quantity}\n"
+                        f"💴 {item.total_rub:.2f} ₽\n\n"
+                        f"🔗 {item.product_url}\n\n"
+                        f"https://t.me/{item.username}"
+                    )
                 )
 
+                print("ADMIN MESSAGE SENT")
+
             except Exception as e:
-                print(e)
+                print("ADMIN ERROR:", e)
+
+
+
+            except Exception as e:
+
+                print("ADMIN ERROR:", repr(e))
 
         for item in items:
             await session.delete(item)
@@ -558,6 +567,7 @@ async def get_quantity(message: Message, state: FSMContext):
 
             user_id=message.from_user.id,
             username=message.from_user.username,
+            product_url=product_url,
 
             product_name=product_name,
 
@@ -569,8 +579,7 @@ async def get_quantity(message: Message, state: FSMContext):
 
             total_rub=final_price,
 
-            image=image,
-            product_url=product_url
+            image=image
         )
 
         session.add(cart_item)
@@ -601,19 +610,60 @@ async def get_link(message: Message, state: FSMContext):
     if await state.get_state():
         return
 
-    if "1688.com" not in message.text and "qr.1688.com" not in message.text:
+    import re
+
+    text = message.text.strip()
+
+    # =========================
+    # ИЩЕМ ССЫЛКУ В ТЕКСТЕ
+    # =========================
+
+    url = None
+
+    patterns = [
+
+        r'https?://[^\s]+',
+
+        r'https://qr\.1688\.com/[^\s]+',
+
+        r'https://detail\.1688\.com/[^\s]+',
+
+        r'https://m\.1688\.com/[^\s]+'
+    ]
+
+    for pattern in patterns:
+
+        match = re.search(pattern, text)
+
+        if match:
+
+            url = match.group(0)
+
+            break
+
+    # =========================
+    # ЕСЛИ ССЫЛКИ НЕТ
+    # =========================
+
+    if not url:
 
         await message.answer(
-            "❌ Отправь ссылку 1688"
+            "❌ Не удалось найти ссылку 1688"
         )
 
         return
+
+    print("FOUND URL:", url)
+
+    # =========================
+    # PARSE
+    # =========================
 
     wait_message = await message.answer(
         "⏳ Парсю товар..."
     )
 
-    data = await parse_1688_product(message.text)
+    data = await parse_1688_product(url)
 
     if not data["skus"]:
 
@@ -623,22 +673,25 @@ async def get_link(message: Message, state: FSMContext):
 
         return
 
-    data["product_url"] = message.text
+    data["url"] = url
 
     products_cache[message.from_user.id] = data
 
     builder = InlineKeyboardBuilder()
 
-    for i, sku in enumerate(data["skus"][:20]):
+    for i, sku in enumerate(data["skus"][:50]):
 
         builder.button(
-            text=f"{sku['name']} — {sku['price']}",
+            text=f"{sku['name']} — {sku['price']} ¥",
             callback_data=f"sku_{i}"
         )
 
     builder.adjust(1)
 
-    # ЕСЛИ ЕСТЬ SKU
+    # =========================
+    # TEXT
+    # =========================
+
     if len(data["skus"]) > 1:
 
         response = (
@@ -646,7 +699,6 @@ async def get_link(message: Message, state: FSMContext):
             f"👇 Выберите вариант:"
         )
 
-    # ЕСЛИ SKU НЕТ
     else:
 
         response = (
@@ -657,7 +709,10 @@ async def get_link(message: Message, state: FSMContext):
 
     image = data.get("image")
 
+    # =========================
     # PHOTO
+    # =========================
+
     if image and image.startswith("http"):
 
         try:
@@ -712,7 +767,7 @@ async def choose_sku(callback: CallbackQuery, state: FSMContext):
         sku_name=sku["name"],
         sku_price=sku["price"],
         image=data.get("image"),
-        product_url=data.get("product_url")
+        product_url=data.get("url")
     )
 
     await state.set_state(
@@ -727,10 +782,15 @@ async def choose_sku(callback: CallbackQuery, state: FSMContext):
 
     await callback.answer()
 
-
+from database.db import engine, Base
+from database.models import *
 async def main():
 
     print("BOT STARTED")
+
+    # СОЗДАНИЕ ТАБЛИЦ
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
 
     await init_browser()
 

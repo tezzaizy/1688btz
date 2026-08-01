@@ -1,16 +1,16 @@
-from pathlib import Path
-
-BASE_DIR = Path(__file__).resolve().parent.parent
-
-DATABASE_URL = f"sqlite+aiosqlite:///{BASE_DIR}/orders.db"
-
 from sqlalchemy.ext.asyncio import (
     create_async_engine,
     async_sessionmaker,
+    AsyncSession
 )
 
 from sqlalchemy.orm import DeclarativeBase
 
+DATABASE_URL = "sqlite+aiosqlite:///database.db"
+
+
+class Base(DeclarativeBase):
+    pass
 
 
 engine = create_async_engine(
@@ -20,28 +20,6 @@ engine = create_async_engine(
 
 AsyncSessionLocal = async_sessionmaker(
     engine,
+    class_=AsyncSession,
     expire_on_commit=False
 )
-
-
-class Base(DeclarativeBase):
-    pass
-
-
-async def init_db():
-
-    # ВАЖНО: импорт моделей внутри функции
-    import database.models
-
-    async with engine.begin() as conn:
-
-        await conn.run_sync(
-            Base.metadata.create_all
-        )
-
-
-if __name__ == "__main__":
-
-    import asyncio
-
-    asyncio.run(init_db())

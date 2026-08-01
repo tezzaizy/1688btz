@@ -5,16 +5,15 @@ from database.db import Base
 
 class Order(Base):
 
-    product_url = Column(Text)
-
     __tablename__ = "orders"
 
     id = Column(Integer, primary_key=True)
+    username = Column(String)
 
     user_id = Column(Integer)
 
     product_name = Column(String)
-    username = Column(String)
+
     sku_name = Column(String)
 
     quantity = Column(Integer)
@@ -36,12 +35,11 @@ class Settings(Base):
 
 
 class CartItem(Base):
-    product_url = Column(Text)
-    username = Column(String)
 
     __tablename__ = "cart_items"
 
     id = Column(Integer, primary_key=True)
+    username = Column(String)
 
     user_id = Column(Integer)
 
@@ -56,3 +54,4 @@ class CartItem(Base):
     total_rub = Column(Float)
 
     image = Column(String)
+    product_url = Column(Text)

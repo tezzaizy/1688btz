@@ -1,6 +1,8 @@
 import re
-import aiohttp
+import json
+import html
 
+from deep_translator import GoogleTranslator
 from playwright.async_api import async_playwright
 
 browser = None
@@ -8,7 +10,9 @@ context = None
 playwright_instance = None
 
 
-# СТАРТ БРАУЗЕРА
+# =========================
+# START BROWSER
+# =========================
 async def init_browser():
 
     global browser
@@ -16,63 +20,68 @@ async def init_browser():
     global playwright_instance
 
     try:
-        if browser:
+        if context:
+            _ = context.pages
             return context
     except:
         pass
 
+    print("STEP 1: START INIT")
+
     playwright_instance = await async_playwright().start()
 
-    browser = await playwright_instance.chromium.launch(
-        channel="chromium",
-        headless=True,
+    browser = await playwright_instance.chromium.launch_persistent_context(
+        user_data_dir="userdata",
+
+        headless=False,
+
+        viewport={
+            "width": 1400,
+            "height": 1000
+        },
+
         args=[
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-gpu",
+            "--start-maximized",
             "--disable-blink-features=AutomationControlled"
         ]
     )
 
-    context = await browser.new_context(
-        viewport={
-            "width": 1280,
-            "height": 900
-        }
-    )
+    context = browser
 
     print("BROWSER STARTED")
 
     return context
 
 
-# QR -> NORMAL URL
+# =========================
+# RESOLVE URL
+# =========================
 async def resolve_1688_url(url):
+
+    global context
 
     try:
 
-        async with aiohttp.ClientSession() as session:
+        if "offer/" in url or "detail.1688.com" in url:
+            return url
 
-            async with session.get(
-                url,
-                allow_redirects=True,
-                timeout=20,
-                headers={
-                    "User-Agent": (
-                        "Mozilla/5.0 "
-                        "(Windows NT 10.0; Win64; x64) "
-                        "AppleWebKit/537.36 "
-                        "(KHTML, like Gecko) "
-                        "Chrome/124.0 Safari/537.36"
-                    )
-                }
-            ) as response:
+        temp_page = await context.new_page()
 
-                final_url = str(response.url)
+        await temp_page.goto(
+            url,
+            wait_until="domcontentloaded",
+            timeout=120000
+        )
 
-                print("FINAL URL:", final_url)
+        await temp_page.wait_for_timeout(5000)
 
-                return final_url
+        final_url = temp_page.url
+
+        print("FINAL URL:", final_url)
+
+        await temp_page.close()
+
+        return final_url
 
     except Exception as e:
 
@@ -81,7 +90,78 @@ async def resolve_1688_url(url):
         return url
 
 
-# ПАРСЕР
+# =========================
+# EXTRACT REAL PRICE
+# =========================
+def extract_real_price(text):
+
+    matches = re.findall(
+        r"(?:¥|￥)\s*(\d+(?:\.\d+)?)",
+        text
+    )
+
+    prices = []
+
+    for m in matches:
+
+        try:
+
+            value = float(m)
+
+            if 15 <= value <= 50000:
+                prices.append(value)
+
+        except:
+            pass
+
+    if not prices:
+        return "0"
+
+    price = min(prices)
+
+    if str(price).endswith(".0"):
+        return str(int(price))
+
+    return str(price)
+
+
+# =========================
+# =========================
+# TRANSLATE
+# =========================
+
+import html
+
+
+def translate_text(text):
+
+    try:
+
+        # исправляем &gt; &amp; и т.д.
+        text = html.unescape(text)
+
+        translated = GoogleTranslator(
+            source='auto',
+            target='ru'
+        ).translate(text)
+
+        translated = html.unescape(translated)
+
+        # красиво разделяем SKU
+        translated = translated.replace(">", " / ")
+
+        return translated
+
+    except Exception as e:
+
+        print("TRANSLATE ERROR:", e)
+
+        return html.unescape(text)
+
+
+# =========================
+# MAIN PARSER
+# =========================
 async def parse_1688_product(url):
 
     global context
@@ -100,23 +180,26 @@ async def parse_1688_product(url):
 
         await page.goto(
             url,
-            timeout=60000,
-            wait_until="networkidle"
+            timeout=120000,
+            wait_until="domcontentloaded"
         )
-        await page.wait_for_timeout(10000)
 
-        # Ждем появления SKU
-        try:
+        await page.wait_for_timeout(8000)
 
-            await page.wait_for_selector(
-                ".sku-item, .expand-view-item, .sku-item-wrapper",
-                timeout=15000
-            )
+        # =========================
+        # SAVE HTML
+        # =========================
 
-        except:
-            pass
+        html = await page.content()
 
-        await page.wait_for_timeout(3000)
+        with open(
+            "page.html",
+            "w",
+            encoding="utf-8"
+        ) as f:
+            f.write(html)
+
+        print("HTML SAVED")
 
         print("START PARSE")
 
@@ -125,17 +208,19 @@ async def parse_1688_product(url):
         skus = []
         main_price = "0"
 
+        # =========================
         # TITLE
+        # =========================
         try:
 
-            title_selectors = [
+            selectors = [
                 "h1",
                 ".title-text",
                 ".d-title",
-                "#productTitle h1"
+                ".od-pc-offer-title"
             ]
 
-            for selector in title_selectors:
+            for selector in selectors:
 
                 locator = page.locator(selector)
 
@@ -145,181 +230,224 @@ async def parse_1688_product(url):
 
                     text = text.strip()
 
-                    if text:
+                    if len(text) > 3:
 
                         title = text
-
                         break
+
+            print("TITLE:", title)
 
         except Exception as e:
             print("TITLE ERROR:", e)
 
-        # MAIN PRICE
+        # =========================
+        # PRICE
+        # =========================
         try:
 
             body_text = await page.locator("body").inner_text()
 
-            matches = re.findall(
-                r"[¥￥]\s*(\d+(?:\.\d+)?)",
-                body_text
-            )
+            main_price = extract_real_price(body_text)
+            # =========================
+            # =========================
+            # PRICE FROM HTML JSON
+            # =========================
 
-            if matches:
+            try:
 
-                prices = [
-                    float(x)
-                    for x in matches
-                ]
+                # ищем блоки цена + минимальное количество
+                price_blocks = re.findall(
+                    r'"price":"(\d+(?:\.\d+)?)".*?"beginAmount":(\d+)',
+                    html
+                )
 
-                # убираем слишком маленькие мусорные цены
-                prices = [
-                    x for x in prices
-                    if x >= 1
-                ]
+                print("PRICE BLOCKS:", price_blocks)
 
-                if prices:
+                found_price = None
 
-                    main_price = str(min(prices))
+                # сначала ищем цену за 1 штуку
+                for price, amount in price_blocks:
 
-                    if main_price.endswith(".0"):
-                        main_price = main_price[:-2]
+                    if int(amount) == 1:
+                        found_price = price
+                        break
+
+                # если нет beginAmount=1
+                # берем первый блок
+                if not found_price and price_blocks:
+                    found_price = price_blocks[0][0]
+
+                if found_price:
+                    main_price = found_price
+
+                    print("MAIN PRICE FROM JSON:", main_price)
+
+            except Exception as e:
+
+                print("HTML PRICE ERROR:", e)
 
             print("MAIN PRICE:", main_price)
 
         except Exception as e:
-            print("MAIN PRICE ERROR:", e)
+            print("PRICE ERROR:", e)
 
+        # =========================
         # IMAGE
+        # =========================
         try:
 
             image_selectors = [
-                ".detail-gallery-img img",
+                "img[src*=jpg]",
+                "img[src*=png]",
+                "img[data-src]",
+                ".detail-gallery img",
                 ".main-img img",
-                ".gallery-img img",
                 "img"
             ]
 
             for selector in image_selectors:
 
-                try:
+                locator = page.locator(selector)
 
-                    locator = page.locator(selector)
-
-                    if await locator.count() > 0:
-
-                        src = await locator.first.get_attribute("src")
-
-                        if src:
-
-                            if src.startswith("//"):
-                                src = "https:" + src
-
-                            if src.startswith("/"):
-                                src = "https://detail.1688.com" + src
-
-                            src = src.replace(".webp", ".jpg")
-
-                            if src.startswith("http"):
-
-                                image = src
-
-                                print("IMAGE FOUND")
-
-                                break
-
-                except:
-                    pass
-
-        except Exception as e:
-            print("IMAGE ERROR:", e)
-
-        # SKU
-        try:
-
-            selectors = [
-                ".expand-view-item",
-                ".sku-item-wrapper",
-                ".prop-item",
-                ".sku-item",
-                ".table-sku",
-                "[class*=sku]",
-                "[class*=Sku]"
-            ]
-
-            for selector in selectors:
-
-                sku_items = page.locator(selector)
-
-                count = await sku_items.count()
+                count = await locator.count()
 
                 if count <= 0:
                     continue
 
-                print("SKU FOUND:", selector)
-                print("SKU COUNT:", count)
-
-                for i in range(min(count, 50)):
+                for i in range(min(count, 20)):
 
                     try:
 
-                        item = sku_items.nth(i)
+                        img = locator.nth(i)
 
-                        text = await item.inner_text()
+                        src = await img.get_attribute("src")
 
-                        text = text.strip()
+                        if not src:
+                            src = await img.get_attribute("data-src")
 
-                        if not text:
+                        if not src:
                             continue
 
-                        lines = [
-                            x.strip()
-                            for x in text.split("\n")
-                            if x.strip()
+                        if src.startswith("//"):
+                            src = "https:" + src
+
+                        if "svg" in src:
+                            continue
+
+                        if len(src) < 20:
+                            continue
+
+                        image = src.split("?")[0]
+
+                        print("IMAGE FOUND:", image)
+
+                        break
+
+                    except:
+                        pass
+
+                if image:
+                    break
+
+        except Exception as e:
+            print("IMAGE ERROR:", e)
+
+        # =========================
+        # SKU JSON
+        # =========================
+
+        try:
+
+            match = re.search(
+                r'"skuMapOriginal":\s*(\[[\s\S]*?\])',
+                html
+            )
+
+            if match:
+
+                sku_json = match.group(1)
+
+                data = json.loads(sku_json)
+
+                print("SKU JSON FOUND:", len(data))
+
+                for item in data:
+
+                    try:
+
+                        name = item.get(
+                            "specAttrs",
+                            "Стандарт"
+                        )
+
+                        price_fields = [
+                            item.get("discountPrice"),
+                            item.get("price"),
+                            item.get("salePrice"),
+                            item.get("priceDisplay"),
+                            item.get("displayPrice"),
+                            item.get("priceRange")
                         ]
 
-                        if not lines:
-                            continue
+                        price = None
 
-                        sku_name = lines[0][:60]
+                        for p in price_fields:
 
-                        price = main_price
+                            if not p:
+                                continue
 
-                        # ИЩЕМ ЦЕНУ ТОЛЬКО В СТРОКАХ С ¥
-                        for line in lines:
+                            p = str(p).strip()
 
-                            if "¥" in line or "￥" in line or "元" in line:
+                            # мусор
+                            if p in ["0", "0.0", "0.00", ""]:
+                                continue
 
-                                match = re.search(
-                                    r"(\d+(?:\.\d+)?)",
-                                    line
-                                )
+                            # если диапазон цен
+                            # например: 31.00-45.00
+                            if "-" in p:
 
-                                if match:
+                                try:
 
-                                    found_price = match.group(1)
+                                    p = p.split("-")[0].strip()
 
-                                    # защита от артикулов
-                                    if float(found_price) < 100000:
+                                except:
+                                    pass
 
-                                        price = found_price
-                                        break
+                            price = p
+                            break
 
-                        if price.endswith(".0"):
-                            price = price[:-2]
+                        # если вообще ничего нет
+                        if not price:
+                            price = main_price
+
+                        # если main_price тоже 0
+                        if str(price).strip() in ["0", "0.0", "0.00", ""]:
+
+                            body_text = await page.locator("body").inner_text()
+
+                            extracted = extract_real_price(body_text)
+
+                            if extracted != "0":
+                                price = extracted
+
+                        # финальная защита
+                        if str(price).strip() in ["0", "0.0", "0.00", ""]:
+                            price = "Цена не указана"
+
+                        translated_name = translate_text(name)
 
                         skus.append({
-                            "name": sku_name,
+                            "name": translated_name,
                             "price": price
                         })
 
                     except Exception as e:
+
                         print("SKU ITEM ERROR:", e)
 
-                if skus:
-                    break
+            else:
 
-            # ЕСЛИ SKU НЕ НАШЛИСЬ
-            if not skus:
+                print("SKU JSON NOT FOUND")
 
                 skus.append({
                     "name": "Стандарт",
@@ -327,7 +455,35 @@ async def parse_1688_product(url):
                 })
 
         except Exception as e:
-            print("SKU ERROR:", e)
+
+            print("SKU JSON ERROR:", e)
+
+            skus.append({
+                "name": "Стандарт",
+                "price": main_price
+            })
+
+        # =========================
+        # REMOVE DUPLICATES
+        # =========================
+
+        unique_skus = []
+
+        used = set()
+
+        for sku in skus:
+
+            key = f"{sku['name']}|{sku['price']}"
+
+            if key not in used:
+
+                used.add(key)
+
+                unique_skus.append(sku)
+
+        skus = unique_skus
+
+        print("SKUS:", skus)
 
         print("PARSE DONE")
 
